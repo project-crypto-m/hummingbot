@@ -4,7 +4,7 @@ import time
 from typing import Any, Dict, List, Optional
 
 from hummingbot.connector.exchange.swaphere import swaphere_constants as CONSTANTS
-from hummingbot.connector.exchange.swaphere.swaphere_web_utils import api_request
+from hummingbot.connector.exchange.swaphere.swaphere_web_utils import api_request, public_rest_url, format_trading_pair
 from hummingbot.core.data_type.order_book import OrderBook
 from hummingbot.core.data_type.order_book_message import OrderBookMessage
 from hummingbot.core.data_type.order_book_tracker_data_source import OrderBookTrackerDataSource
@@ -35,20 +35,23 @@ class SwaphereAPIOrderBookDataSource(OrderBookTrackerDataSource):
     async def get_snapshot(
         self, 
         trading_pair: str, 
-        limit: int = 1000,
+        limit: int = 2,  # Level 2 order book
     ) -> Dict[str, Any]:
         """
         Get current order book snapshot for a trading pair
         :param trading_pair: the trading pair to get snapshot for
-        :param limit: the number of asks/bids to get
+        :param limit: the level of order book detail (2 is standard)
         :return: snapshot data in dictionary format
         """
+        formatted_pair = format_trading_pair(trading_pair)
+        path = CONSTANTS.SWAPHERE_PRODUCT_BOOK_PATH.format(formatted_pair)
+        
         params = {
-            "instId": trading_pair,
-            "sz": limit,
+            "level": limit,
         }
+        
         snapshot = await api_request(
-            path=CONSTANTS.SWAPHERE_ORDER_BOOK_PATH,
+            path=path,
             api_factory=self._web_assistants_factory,
             params=params,
         )
@@ -60,18 +63,31 @@ class SwaphereAPIOrderBookDataSource(OrderBookTrackerDataSource):
         :param trading_pair: the trading pair to create order book for
         :return: a new order book
         """
-        snapshot = await self.get_snapshot(trading_pair, 1000)
-        snapshot_timestamp = int(snapshot.get("ts", time.time() * 1000))
+        snapshot = await self.get_snapshot(trading_pair)
+        snapshot_timestamp = int(time.time() * 1000)  # Use current time if not provided in response
+        
+        # Process bids and asks based on the Swaphere API format
+        # Assuming format like {"bids": [[price, size], ...], "asks": [[price, size], ...]}
+        bids = []
+        asks = []
+        
+        if "bids" in snapshot:
+            bids = [[float(price), float(amount)] for price, amount in snapshot.get("bids", [])]
+        
+        if "asks" in snapshot:
+            asks = [[float(price), float(amount)] for price, amount in snapshot.get("asks", [])]
+        
         snapshot_msg = OrderBookMessage(
             OrderBookMessage.MESSAGE_TYPE_SNAPSHOT,
             {
                 "trading_pair": trading_pair,
                 "update_id": snapshot_timestamp,
-                "bids": snapshot.get("bids", []),
-                "asks": snapshot.get("asks", []),
+                "bids": bids,
+                "asks": asks,
             },
             timestamp=snapshot_timestamp * 1e-3,
         )
+        
         order_book = self.order_book_create_function()
         order_book.apply_snapshot(snapshot_msg.bids, snapshot_msg.asks, snapshot_msg.update_id)
         return order_book
@@ -84,7 +100,7 @@ class SwaphereAPIOrderBookDataSource(OrderBookTrackerDataSource):
         if self._ws_assistant is None:
             self._ws_assistant = await self._web_assistants_factory.get_ws_assistant()
             await self._ws_assistant.connect(
-                ws_url=CONSTANTS.SWAPHERE_WS_URI_PUBLIC,
+                ws_url=CONSTANTS.SWAPHERE_WS_URI,
                 ping_timeout=30,
             )
         return self._ws_assistant
@@ -95,23 +111,20 @@ class SwaphereAPIOrderBookDataSource(OrderBookTrackerDataSource):
         """
         ws = await self._connected_websocket_assistant()
         for trading_pair in self._trading_pairs:
+            formatted_pair = format_trading_pair(trading_pair)
+            
+            # Subscribe to order book channel
             orderbook_subscription = {
                 "op": "subscribe",
-                "args": [
-                    {
-                        "channel": CONSTANTS.SWAPHERE_WS_PUBLIC_BOOKS_CHANNEL,
-                        "instId": trading_pair,
-                    },
-                ],
+                "channel": CONSTANTS.SWAPHERE_WS_ORDERBOOK_CHANNEL,
+                "product_id": formatted_pair
             }
+            
+            # Subscribe to trades channel
             trades_subscription = {
                 "op": "subscribe",
-                "args": [
-                    {
-                        "channel": CONSTANTS.SWAPHERE_WS_PUBLIC_TRADES_CHANNEL,
-                        "instId": trading_pair,
-                    },
-                ],
+                "channel": CONSTANTS.SWAPHERE_WS_TRADES_CHANNEL,
+                "product_id": formatted_pair
             }
             
             orderbook_request = WSJSONRequest(payload=orderbook_subscription)
@@ -135,17 +148,23 @@ class SwaphereAPIOrderBookDataSource(OrderBookTrackerDataSource):
                 
                 async for ws_response in ws.iter_messages():
                     data = ws_response.data
-                    if data.get("arg", {}).get("channel") == CONSTANTS.SWAPHERE_WS_PUBLIC_BOOKS_CHANNEL:
-                        trading_pair = data.get("arg", {}).get("instId")
-                        timestamp = int(data.get("data", [{}])[0].get("ts", time.time() * 1000))
+                    
+                    # Check if this is an order book update message
+                    if data.get("channel") == CONSTANTS.SWAPHERE_WS_ORDERBOOK_CHANNEL:
+                        trading_pair = data.get("product_id")
+                        timestamp = int(time.time() * 1000)  # Use current time if not in message
+                        
+                        # Process the order book update based on Swaphere's format
+                        bids = [[float(price), float(amount)] for price, amount in data.get("bids", [])]
+                        asks = [[float(price), float(amount)] for price, amount in data.get("asks", [])]
                         
                         order_book_message = OrderBookMessage(
                             OrderBookMessage.MESSAGE_TYPE_DIFF,
                             {
                                 "trading_pair": trading_pair,
                                 "update_id": timestamp,
-                                "bids": data.get("data", [{}])[0].get("bids", []),
-                                "asks": data.get("data", [{}])[0].get("asks", []),
+                                "bids": bids,
+                                "asks": asks,
                             },
                             timestamp=timestamp * 1e-3,
                         )
@@ -172,28 +191,44 @@ class SwaphereAPIOrderBookDataSource(OrderBookTrackerDataSource):
                 
                 async for ws_response in ws.iter_messages():
                     data = ws_response.data
-                    if data.get("arg", {}).get("channel") == CONSTANTS.SWAPHERE_WS_PUBLIC_TRADES_CHANNEL:
-                        for trade_data in data.get("data", []):
-                            trading_pair = data.get("arg", {}).get("instId")
-                            timestamp = int(trade_data.get("ts", time.time() * 1000))
-                            
-                            trade_message = OrderBookMessage(
-                                OrderBookMessage.MESSAGE_TYPE_TRADE,
-                                {
-                                    "trading_pair": trading_pair,
-                                    "trade_id": trade_data.get("tradeId"),
-                                    "trade_type": float(trade_data.get("side", "buy") == "buy"),
-                                    "amount": float(trade_data.get("sz", "0")),
-                                    "price": float(trade_data.get("px", "0")),
-                                },
-                                timestamp=timestamp * 1e-3,
-                            )
-                            
-                            output.put_nowait(trade_message)
+                    
+                    # Check if this is a trade message
+                    if data.get("channel") == CONSTANTS.SWAPHERE_WS_TRADES_CHANNEL:
+                        trading_pair = data.get("product_id")
+                        trade_data = data.get("data", {})
+                        
+                        if isinstance(trade_data, list):
+                            for trade in trade_data:
+                                self._process_trade_message(trading_pair, trade, output)
+                        else:
+                            self._process_trade_message(trading_pair, trade_data, output)
                             
             except asyncio.CancelledError:
                 raise
             except Exception:
                 self.logger().error("Unexpected error listening for trades. Retrying after 5 seconds...",
                                   exc_info=True)
-                await asyncio.sleep(5) 
+                await asyncio.sleep(5)
+                
+    def _process_trade_message(self, trading_pair: str, trade_data: Dict[str, Any], output: asyncio.Queue):
+        """
+        Process a single trade message and put it into the output queue
+        :param trading_pair: the trading pair
+        :param trade_data: the trade data
+        :param output: the queue to put the message into
+        """
+        timestamp = int(trade_data.get("time", time.time() * 1000))
+        
+        trade_message = OrderBookMessage(
+            OrderBookMessage.MESSAGE_TYPE_TRADE,
+            {
+                "trading_pair": trading_pair,
+                "trade_id": trade_data.get("sequence", int(timestamp)),
+                "trade_type": float(trade_data.get("side", "") == "buy"),
+                "amount": float(trade_data.get("size", "0")),
+                "price": float(trade_data.get("price", "0")),
+            },
+            timestamp=timestamp * 1e-3,
+        )
+        
+        output.put_nowait(trade_message) 

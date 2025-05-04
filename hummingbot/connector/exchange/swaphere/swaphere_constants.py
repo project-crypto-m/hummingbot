@@ -11,35 +11,32 @@ SECONDS_TO_WAIT_TO_RECEIVE_MESSAGE = 30 * 0.8
 DEFAULT_DOMAIN = ""
 
 # URLs
-SWAPHERE_BASE_URL = "https://api.swaphere.com/"  # Replace with your actual domain
+SWAPHERE_BASE_URL = "http://127.0.0.1:8088"  # Default local server URL, should be configurable
 
 # API Endpoints
-SWAPHERE_SERVER_TIME_PATH = '/api/v2/public/time'
-SWAPHERE_INSTRUMENTS_PATH = '/api/v2/public/instruments'
-SWAPHERE_TICKER_PATH = '/api/v2/market/ticker'
-SWAPHERE_TICKERS_PATH = '/api/v2/market/tickers'
-SWAPHERE_ORDER_BOOK_PATH = '/api/v2/market/books'
-SWAPHERE_TRADES_PATH = '/api/v2/market/trades'
+SWAPHERE_PRODUCTS_PATH = '/api/products'
+SWAPHERE_PRODUCT_BOOK_PATH = '/api/products/{}/book'
+SWAPHERE_PRODUCT_TRADES_PATH = '/api/products/{}/trades'
+SWAPHERE_PRODUCT_CANDLES_PATH = '/api/products/{}/candles'
 
 # Auth required
-SWAPHERE_PLACE_ORDER_PATH = "/api/v2/trade/order"
-SWAPHERE_ORDER_DETAILS_PATH = '/api/v2/trade/order'
-SWAPHERE_ORDER_CANCEL_PATH = '/api/v2/trade/cancel-order'
-SWAPHERE_BATCH_ORDER_CANCEL_PATH = '/api/v2/trade/cancel-batch-orders'
-SWAPHERE_BALANCE_PATH = '/api/v2/account/balance'
-SWAPHERE_TRADE_FILLS_PATH = "/api/v2/trade/fills"
+SWAPHERE_PLACE_ORDER_PATH = "/api/v2/orders"
+SWAPHERE_ORDERS_PATH = '/api/orders'
+SWAPHERE_MARKET_ORDERS_PATH = '/api/market'
+SWAPHERE_ORDER_CANCEL_PATH = '/api/orders/{}'
+SWAPHERE_ORDER_RESERVE_PATH = '/api/v2/orders/{}/reserve'
+SWAPHERE_ORDERBOOK_PATH = '/api/orderbook'
 
 # WS
-SWAPHERE_WS_URI_PUBLIC = "wss://ws.swaphere.com:8443/ws/v2/public"
-SWAPHERE_WS_URI_PRIVATE = "wss://ws.swaphere.com:8443/ws/v2/private"
+SWAPHERE_WS_URI = "ws://127.0.0.1:8088/ws"  # Placeholder for WebSocket URL
 
-SWAPHERE_WS_ACCOUNT_CHANNEL = "account"
+SWAPHERE_WS_ORDERBOOK_CHANNEL = "orderbook"
+SWAPHERE_WS_TRADES_CHANNEL = "trades"
 SWAPHERE_WS_ORDERS_CHANNEL = "orders"
-SWAPHERE_WS_PUBLIC_TRADES_CHANNEL = "trades"
-SWAPHERE_WS_PUBLIC_BOOKS_CHANNEL = "books"
 
 SWAPHERE_WS_CHANNELS = {
-    SWAPHERE_WS_ACCOUNT_CHANNEL,
+    SWAPHERE_WS_ORDERBOOK_CHANNEL,
+    SWAPHERE_WS_TRADES_CHANNEL,
     SWAPHERE_WS_ORDERS_CHANNEL
 }
 
@@ -56,9 +53,32 @@ ORDER_STATE = {
 }
 
 ORDER_TYPE_MAP = {
-    OrderType.LIMIT: "limit",
-    OrderType.MARKET: "market",
-    OrderType.LIMIT_MAKER: "post_only",
+    OrderType.LIMIT: "LIMIT",
+    OrderType.MARKET: "MARKET",
+    OrderType.LIMIT_MAKER: "LIMIT",  # Using LIMIT for LIMIT_MAKER since there's no specific type
+}
+
+# Blockchain context information for EIP-712 signing
+DEFAULT_BLOCKCHAIN_CONTEXT = {
+    "partialTokenSwapStandard": "0x1234567890123456789012345678901234567890",
+    "name": "Swaphere",
+    "version": "1",
+    "chainId": 1,
+    "verifyingContract": "0x0987654321098765432109876543210987654321"
+}
+
+# Used for ethers.js typed data signing
+TYPES = {
+    "Swap": [
+        {"name": "isFullOrder", "type": "bool"},
+        {"name": "nonce", "type": "uint24"},
+        {"name": "timestamp", "type": "uint64"},
+        {"name": "solver", "type": "address"},
+        {"name": "outToken", "type": "address"},
+        {"name": "outAmount", "type": "uint128"},
+        {"name": "inToken", "type": "address"},
+        {"name": "inAmount", "type": "uint128"}
+    ]
 }
 
 NO_LIMIT = sys.maxsize
@@ -68,15 +88,14 @@ RATE_LIMITS = [
     RateLimit(WS_REQUEST_LIMIT_ID, limit=100, time_interval=10),
     RateLimit(WS_SUBSCRIPTION_LIMIT_ID, limit=240, time_interval=60 * 60),
     RateLimit(WS_LOGIN_LIMIT_ID, limit=1, time_interval=15),
-    RateLimit(limit_id=SWAPHERE_SERVER_TIME_PATH, limit=10, time_interval=2),
-    RateLimit(limit_id=SWAPHERE_INSTRUMENTS_PATH, limit=20, time_interval=2),
-    RateLimit(limit_id=SWAPHERE_TICKER_PATH, limit=20, time_interval=2),
-    RateLimit(limit_id=SWAPHERE_TICKERS_PATH, limit=20, time_interval=2),
-    RateLimit(limit_id=SWAPHERE_ORDER_BOOK_PATH, limit=20, time_interval=2),
+    RateLimit(limit_id=SWAPHERE_PRODUCTS_PATH, limit=10, time_interval=2),
+    RateLimit(limit_id=SWAPHERE_PRODUCT_BOOK_PATH, limit=20, time_interval=2),
+    RateLimit(limit_id=SWAPHERE_PRODUCT_TRADES_PATH, limit=20, time_interval=2),
+    RateLimit(limit_id=SWAPHERE_PRODUCT_CANDLES_PATH, limit=20, time_interval=2),
     RateLimit(limit_id=SWAPHERE_PLACE_ORDER_PATH, limit=20, time_interval=2),
-    RateLimit(limit_id=SWAPHERE_ORDER_DETAILS_PATH, limit=20, time_interval=2),
+    RateLimit(limit_id=SWAPHERE_ORDERS_PATH, limit=20, time_interval=2),
     RateLimit(limit_id=SWAPHERE_ORDER_CANCEL_PATH, limit=20, time_interval=2),
-    RateLimit(limit_id=SWAPHERE_BATCH_ORDER_CANCEL_PATH, limit=300, time_interval=2),
-    RateLimit(limit_id=SWAPHERE_BALANCE_PATH, limit=10, time_interval=2),
-    RateLimit(limit_id=SWAPHERE_TRADE_FILLS_PATH, limit=60, time_interval=2),
+    RateLimit(limit_id=SWAPHERE_ORDER_RESERVE_PATH, limit=20, time_interval=2),
+    RateLimit(limit_id=SWAPHERE_ORDERBOOK_PATH, limit=10, time_interval=2),
+    RateLimit(limit_id=SWAPHERE_MARKET_ORDERS_PATH, limit=10, time_interval=2),
 ] 

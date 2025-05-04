@@ -25,7 +25,6 @@ class SwaphereAPIUserStreamDataSource(UserStreamTrackerDataSource):
         self._trading_pairs = trading_pairs or []
         self._web_assistants_factory = web_assistants_factory or WebAssistantsFactory(auth=self._auth)
         self._ws_assistant: Optional[WSAssistant] = None
-        self._current_listening_key = None
         
     @classmethod
     def logger(cls) -> HummingbotLogger:
@@ -41,10 +40,34 @@ class SwaphereAPIUserStreamDataSource(UserStreamTrackerDataSource):
         if self._ws_assistant is None:
             self._ws_assistant = await self._web_assistants_factory.get_ws_assistant()
             await self._ws_assistant.connect(
-                ws_url=CONSTANTS.SWAPHERE_WS_URI_PRIVATE,
+                ws_url=CONSTANTS.SWAPHERE_WS_URI,
                 ping_timeout=30,
             )
+            
+            # Authenticate the websocket connection
+            auth_request = await self._auth.ws_authenticate(WSJSONRequest(payload={}))
+            await self._ws_assistant.send(auth_request)
+            
+            # Wait for the authentication response
+            response = await self._ws_assistant.receive()
+            if not self._is_valid_auth_response(response.data):
+                self.logger().error("Failed to authenticate websocket connection")
+                await self._ws_assistant.disconnect()
+                self._ws_assistant = None
+                raise ValueError("Websocket authentication failed")
+                
+            self.logger().info("Websocket authenticated successfully")
+            
         return self._ws_assistant
+        
+    def _is_valid_auth_response(self, response_data: dict) -> bool:
+        """
+        Check if the authentication response is valid
+        :param response_data: the response data
+        :return: True if valid, False otherwise
+        """
+        # Implement based on the actual response structure from Swaphere
+        return response_data.get("success", False) or not response_data.get("error")
         
     async def listen_for_user_stream(self, output: asyncio.Queue):
         """
@@ -55,55 +78,32 @@ class SwaphereAPIUserStreamDataSource(UserStreamTrackerDataSource):
         try:
             ws = await self._connected_websocket_assistant()
             
-            # Subscribe to account and orders channels
-            account_subscription = {
-                "op": "subscribe",
-                "args": [
-                    {
-                        "channel": CONSTANTS.SWAPHERE_WS_ACCOUNT_CHANNEL,
-                    },
-                ],
-            }
-            
+            # Subscribe to orders channel
             orders_subscription = {
                 "op": "subscribe",
-                "args": [
-                    {
-                        "channel": CONSTANTS.SWAPHERE_WS_ORDERS_CHANNEL,
-                        "instType": "SPOT",
-                    },
-                ],
+                "channel": CONSTANTS.SWAPHERE_WS_ORDERS_CHANNEL,
+                "address": self._auth.address
             }
             
-            account_request = WSJSONRequest(payload=account_subscription)
             orders_request = WSJSONRequest(payload=orders_subscription)
-            
-            await ws.send(account_request)
             await ws.send(orders_request)
             
-            self.logger().info("Subscribed to private account and orders channels")
+            self.logger().info(f"Subscribed to private orders channel for address {self._auth.address}")
             
             # Listen for messages
             async for ws_response in ws.iter_messages():
                 data = ws_response.data
-                if "event" in data:
-                    # Handle subscription responses
-                    if data["event"] == "subscribe" and data.get("success") is True:
-                        channel = data.get("channel")
-                        self.logger().info(f"Successfully subscribed to {channel} channel")
+                
+                # Check for subscription confirmation
+                if data.get("type") == "subscribed" and data.get("channel") == CONSTANTS.SWAPHERE_WS_ORDERS_CHANNEL:
+                    self.logger().info("Successfully subscribed to orders channel")
                     continue
                     
-                if "arg" in data and "data" in data:
-                    # Process the user account or order update
-                    data_channel = data.get("arg", {}).get("channel")
+                # Order updates
+                if data.get("channel") == CONSTANTS.SWAPHERE_WS_ORDERS_CHANNEL:
+                    # Process order updates - wrap in a dictionary to maintain compatibility
+                    output.put_nowait({"order": data})
                     
-                    if data_channel == CONSTANTS.SWAPHERE_WS_ACCOUNT_CHANNEL:
-                        # Handle account balance updates
-                        output.put_nowait({"account": data.get("data")})
-                    elif data_channel == CONSTANTS.SWAPHERE_WS_ORDERS_CHANNEL:
-                        # Handle order updates
-                        output.put_nowait({"order": data.get("data")})
-                        
         except asyncio.CancelledError:
             raise
         except Exception:
@@ -113,4 +113,10 @@ class SwaphereAPIUserStreamDataSource(UserStreamTrackerDataSource):
             # Close the websocket if needed
             if ws is not None:
                 await ws.disconnect()
-                self._ws_assistant = None 
+                self._ws_assistant = None
+                
+    async def _create_listening_session(self) -> str:
+        """
+        Create a listening session - not required for Swaphere
+        """
+        return "swaphere_session" 

@@ -28,7 +28,7 @@ SWAPHERE_ORDER_RESERVE_PATH = '/api/v2/orders/{}/reserve'
 SWAPHERE_ORDERBOOK_PATH = '/api/orderbook'
 
 # WS
-SWAPHERE_WS_URI = "ws://127.0.0.1:8088/ws"  # Placeholder for WebSocket URL
+SWAPHERE_WS_URI = "ws://127.0.0.1:8088/ws"  # WebSocket URL for local server
 
 SWAPHERE_WS_ORDERBOOK_CHANNEL = "orderbook"
 SWAPHERE_WS_TRADES_CHANNEL = "trades"

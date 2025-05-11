@@ -6,18 +6,12 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Test private key
-PRIVATE_KEY = "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+PRIVATE_KEY = "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"  # noqa: mock
 
 # Mock token information
-ETH_TOKEN = {
-    "address": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
-    "decimal": 18
-}
+ETH_TOKEN = {"address": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2", "decimal": 18}
 
-USDC_TOKEN = {
-    "address": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
-    "decimal": 6
-}
+USDC_TOKEN = {"address": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", "decimal": 6}
 
 # Test functions
 
@@ -41,7 +35,7 @@ async def test_auth_signing():
             in_token=USDC_TOKEN,
             in_amount=2000.0,
             expiration_minutes=60,
-            solver=None  # Use own address
+            solver=None,  # Use own address
         )
 
         logger.info(f"Generated intent (hex): {intent[:50]}...")
@@ -116,6 +110,7 @@ async def test_utils():
         logger.error(f"Error testing utils: {e}", exc_info=True)
         return False
 
+
 # Main function
 
 
@@ -135,6 +130,7 @@ async def main():
         logger.info("All basic tests passed!")
     else:
         logger.error("Some tests failed!")
+
 
 if __name__ == "__main__":
     asyncio.run(main())

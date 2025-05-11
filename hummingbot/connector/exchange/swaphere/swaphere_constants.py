@@ -14,18 +14,18 @@ DEFAULT_DOMAIN = ""
 SWAPHERE_BASE_URL = "http://127.0.0.1:8088"  # Default local server URL, should be configurable
 
 # API Endpoints
-SWAPHERE_PRODUCTS_PATH = '/api/products'
-SWAPHERE_PRODUCT_BOOK_PATH = '/api/products/{}/book'
-SWAPHERE_PRODUCT_TRADES_PATH = '/api/products/{}/trades'
-SWAPHERE_PRODUCT_CANDLES_PATH = '/api/products/{}/candles'
+SWAPHERE_PRODUCTS_PATH = "/api/products"
+SWAPHERE_PRODUCT_BOOK_PATH = "/api/products/{}/book"
+SWAPHERE_PRODUCT_TRADES_PATH = "/api/products/{}/trades"
+SWAPHERE_PRODUCT_CANDLES_PATH = "/api/products/{}/candles"
 
 # Auth required
 SWAPHERE_PLACE_ORDER_PATH = "/api/v2/orders"
-SWAPHERE_ORDERS_PATH = '/api/orders'
-SWAPHERE_MARKET_ORDERS_PATH = '/api/market'
-SWAPHERE_ORDER_CANCEL_PATH = '/api/orders/{}'
-SWAPHERE_ORDER_RESERVE_PATH = '/api/v2/orders/{}/reserve'
-SWAPHERE_ORDERBOOK_PATH = '/api/orderbook'
+SWAPHERE_ORDERS_PATH = "/api/orders"
+SWAPHERE_MARKET_ORDERS_PATH = "/api/market"
+SWAPHERE_ORDER_CANCEL_PATH = "/api/orders/{}"
+SWAPHERE_ORDER_RESERVE_PATH = "/api/v2/orders/{}/reserve"
+SWAPHERE_ORDERBOOK_PATH = "/api/orderbook"
 
 # WS
 SWAPHERE_WS_URI = "ws://127.0.0.1:8088/ws"  # WebSocket URL for local server
@@ -34,11 +34,7 @@ SWAPHERE_WS_ORDERBOOK_CHANNEL = "orderbook"
 SWAPHERE_WS_TRADES_CHANNEL = "trades"
 SWAPHERE_WS_ORDERS_CHANNEL = "orders"
 
-SWAPHERE_WS_CHANNELS = {
-    SWAPHERE_WS_ORDERBOOK_CHANNEL,
-    SWAPHERE_WS_TRADES_CHANNEL,
-    SWAPHERE_WS_ORDERS_CHANNEL
-}
+SWAPHERE_WS_CHANNELS = {SWAPHERE_WS_ORDERBOOK_CHANNEL, SWAPHERE_WS_TRADES_CHANNEL, SWAPHERE_WS_ORDERS_CHANNEL}
 
 WS_CONNECTION_LIMIT_ID = "WSConnection"
 WS_REQUEST_LIMIT_ID = "WSRequest"
@@ -64,7 +60,7 @@ DEFAULT_BLOCKCHAIN_CONTEXT = {
     "name": "Swaphere",
     "version": "1",
     "chainId": 1,
-    "verifyingContract": "0x0987654321098765432109876543210987654321"
+    "verifyingContract": "0x0987654321098765432109876543210987654321",
 }
 
 # Used for ethers.js typed data signing
@@ -77,7 +73,7 @@ TYPES = {
         {"name": "outToken", "type": "address"},
         {"name": "outAmount", "type": "uint128"},
         {"name": "inToken", "type": "address"},
-        {"name": "inAmount", "type": "uint128"}
+        {"name": "inAmount", "type": "uint128"},
     ]
 }
 

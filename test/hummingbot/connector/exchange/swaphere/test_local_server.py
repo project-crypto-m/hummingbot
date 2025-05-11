@@ -296,15 +296,9 @@ async def run_all_tests():
     logger.info(f"Sell order test {'passed' if sell_result else 'failed'}")
 
     # Summary
-    all_passed = all([
-        init_result,
-        order_book_result,
-        rules_result,
-        data_source_result,
-        websocket_result,
-        buy_result,
-        sell_result
-    ])
+    all_passed = all(
+        [init_result, order_book_result, rules_result, data_source_result, websocket_result, buy_result, sell_result]
+    )
 
     logger.info("\n=== Test Summary ===")
     logger.info(f"All tests {'passed' if all_passed else 'failed'}")

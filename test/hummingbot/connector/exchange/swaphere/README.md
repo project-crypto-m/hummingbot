@@ -7,6 +7,12 @@ This directory contains tests for the Swaphere connector. The tests are designed
 1. A running Swaphere server at `localhost:8088`
 2. Python 3.8+
 3. Hummingbot environment set up
+4. Required Python dependencies:
+   - eth-account
+   - web3
+   - hexbytes
+   - bidict
+   - aioprocessing
 
 ## Test Structure
 
@@ -15,8 +21,40 @@ The tests are organized into several files:
 - **test_swaphere_basic.py**: Tests basic components like auth, web utils, and utility functions
 - **test_swaphere_connector.py**: Tests the SwaphereExchange connector class
 - **test_swaphere_utils.py**: Tests utility functions specific to the Swaphere connector
+- **test_swaphere_import.py**: Tests import dependencies to ensure no circular imports
 - **test_local_server.py**: Tests connectivity with a local Swaphere server
 - **run_tests.py**: Script to run all tests
+
+## Important Notes About Circular Import Issues
+
+The connector uses a "proxy class" pattern to avoid circular dependencies in the Hummingbot codebase while still allowing the connector to be properly registered for the "connect" command:
+
+1. **__init__.py**: Contains a proxy `SwaphereExchange` class that defers actual implementation import
+2. **dummy.py**: A placeholder file for initial registration
+3. **swaphere_exchange.py**: The actual implementation class that uses late binding imports
+4. **swaphere_utils.py**: Minimizes deep dependencies
+
+### Proxy Class Pattern
+
+The key technique for avoiding circular imports while maintaining "connect" command functionality is in `__init__.py`:
+
+```python
+# Define SwaphereExchange here to avoid circular imports but still expose the class
+class SwaphereExchange:
+    @classmethod
+    def get_implementation(cls, *args, **kwargs):
+        # Import real implementation only when needed
+        from hummingbot.connector.exchange.swaphere.swaphere_exchange import SwaphereExchange as SwaphereExchangeImpl
+        return SwaphereExchangeImpl(*args, **kwargs)
+
+# Expose the proxy class for proper registration
+__all__ = ["SwaphereExchange"]
+```
+
+This allows:
+1. The connector registry to find the class
+2. The "connect swaphere" command to use the proxy class
+3. Circular imports to be avoided since the real implementation is only imported when needed
 
 ## Running Tests
 
@@ -37,6 +75,9 @@ python test_swaphere_connector.py
 
 # Run utility tests
 python test_swaphere_utils.py
+
+# Run import tests (ensure no circular dependencies)
+python test_swaphere_import.py
 
 # Run local server tests
 python test_local_server.py
@@ -74,15 +115,22 @@ If tests fail due to connection issues:
 
 1. Verify the Swaphere server is running at `localhost:8088`
 2. Check the server logs for errors
-3. Ensure the correct ports are open (8088 for HTTP, WS)
 
-### Order Test Issues
+### Circular Import Issues
 
-If order tests fail:
+If you encounter circular import errors, make sure the proxy class pattern is maintained in the connector files:
 
-1. Check if the server supports the test trading pair (ETH-USDC)
-2. Verify the server has order book data for the test trading pair
-3. Ensure the test private key has sufficient balance for placing orders
+1. Keep the proxy class in `__init__.py`
+2. Do not directly import the implementation class in `__init__.py`
+3. Make sure the implementation class (`swaphere_exchange.py`) continues to use late binding imports with `importlib.import_module()`
+
+### Connect Command Issues
+
+If the "connect swaphere" command doesn't work:
+
+1. Ensure `__all__ = ["SwaphereExchange"]` is present in `__init__.py`
+2. Verify the proxy class is properly named `SwaphereExchange`
+3. Make sure the `get_implementation` method in the proxy class properly imports and returns the actual implementation class
 
 ## Extending Tests
 

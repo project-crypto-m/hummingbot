@@ -18,6 +18,7 @@ class SwaphereMockServer:
     """
     A mock server that simulates the Swaphere API for testing purposes.
     """
+
     def __init__(self, host="0.0.0.0", port=8088):
         self.host = host
         self.port = port
@@ -33,29 +34,29 @@ class SwaphereMockServer:
     def _setup_routes(self):
         """Set up the routes for the mock server"""
         # Public endpoints
-        self.app.router.add_get('/api/products', self.handle_products)
-        self.app.router.add_get('/api/products/{trading_pair}/book', self.handle_order_book)
-        self.app.router.add_get('/api/products/{trading_pair}/trades', self.handle_trades)
+        self.app.router.add_get("/api/products", self.handle_products)
+        self.app.router.add_get("/api/products/{trading_pair}/book", self.handle_order_book)
+        self.app.router.add_get("/api/products/{trading_pair}/trades", self.handle_trades)
 
         # Private endpoints
-        self.app.router.add_post('/api/v2/orders', self.handle_place_order)
-        self.app.router.add_get('/api/orders', self.handle_orders)
-        self.app.router.add_delete('/api/orders/{order_id}', self.handle_cancel_order)
+        self.app.router.add_post("/api/v2/orders", self.handle_place_order)
+        self.app.router.add_get("/api/orders", self.handle_orders)
+        self.app.router.add_delete("/api/orders/{order_id}", self.handle_cancel_order)
 
         # WebSocket
-        self.app.router.add_get('/ws', self.handle_websocket)
+        self.app.router.add_get("/ws", self.handle_websocket)
 
     def _create_mock_order_books(self) -> Dict[str, Dict]:
         """Create mock order books for testing"""
         order_books = {
-            'ETH-USDC': {
-                'bids': [[str(2000 - i * 10), str(1.0 / (i + 1))] for i in range(10)],
-                'asks': [[str(2000 + i * 10), str(1.0 / (i + 1))] for i in range(10)]
+            "ETH-USDC": {
+                "bids": [[str(2000 - i * 10), str(1.0 / (i + 1))] for i in range(10)],
+                "asks": [[str(2000 + i * 10), str(1.0 / (i + 1))] for i in range(10)],
             },
-            'BTC-USDC': {
-                'bids': [[str(30000 - i * 100), str(0.1 / (i + 1))] for i in range(10)],
-                'asks': [[str(30000 + i * 100), str(0.1 / (i + 1))] for i in range(10)]
-            }
+            "BTC-USDC": {
+                "bids": [[str(30000 - i * 100), str(0.1 / (i + 1))] for i in range(10)],
+                "asks": [[str(30000 + i * 100), str(0.1 / (i + 1))] for i in range(10)],
+            },
         }
         return order_books
 
@@ -90,7 +91,7 @@ class SwaphereMockServer:
                 "quoteIncrement": "0.01",
                 "baseScale": 18,
                 "quoteScale": 6,
-                "status": "online"
+                "status": "online",
             },
             {
                 "id": "BTC-USDC",
@@ -101,17 +102,17 @@ class SwaphereMockServer:
                 "quoteIncrement": "0.01",
                 "baseScale": 8,
                 "quoteScale": 6,
-                "status": "online"
-            }
+                "status": "online",
+            },
         ]
         return web.json_response(products)
 
     async def handle_order_book(self, request):
         """Handle GET /api/products/{trading_pair}/book request"""
-        trading_pair = request.match_info['trading_pair']
+        trading_pair = request.match_info["trading_pair"]
         # We don't actually use the level parameter, but we get it from the request
         # to match the API's behavior
-        _ = int(request.query.get('level', 2))
+        _ = int(request.query.get("level", 2))
 
         if trading_pair not in self.order_books:
             return web.json_response({"error": "Trading pair not found"}, status=404)
@@ -121,8 +122,8 @@ class SwaphereMockServer:
 
     async def handle_trades(self, request):
         """Handle GET /api/products/{trading_pair}/trades request"""
-        trading_pair = request.match_info['trading_pair']
-        limit = int(request.query.get('limit', 10))
+        trading_pair = request.match_info["trading_pair"]
+        limit = int(request.query.get("limit", 10))
 
         if trading_pair not in self.order_books:
             return web.json_response({"error": "Trading pair not found"}, status=404)
@@ -132,17 +133,19 @@ class SwaphereMockServer:
         trades = []
 
         for i in range(limit):
-            price = float(self.order_books[trading_pair]['bids'][0][0])
-            size = float(self.order_books[trading_pair]['bids'][0][1])
+            price = float(self.order_books[trading_pair]["bids"][0][0])
+            size = float(self.order_books[trading_pair]["bids"][0][1])
             side = "buy" if random.random() > 0.5 else "sell"
 
-            trades.append({
-                "time": current_time - i * 1000,
-                "sequence": 1000 + i,
-                "price": str(price + (random.random() - 0.5) * 10),
-                "size": str(size * random.random()),
-                "side": side
-            })
+            trades.append(
+                {
+                    "time": current_time - i * 1000,
+                    "sequence": 1000 + i,
+                    "price": str(price + (random.random() - 0.5) * 10),
+                    "size": str(size * random.random()),
+                    "side": side,
+                }
+            )
 
         return web.json_response(trades)
 
@@ -163,7 +166,7 @@ class SwaphereMockServer:
                 "type": order_type,
                 "intent": intent[:30] + "...",  # Truncate for brevity
                 "created_at": int(time.time() * 1000),
-                "updated_at": int(time.time() * 1000)
+                "updated_at": int(time.time() * 1000),
             }
 
             self.orders[order_id] = order
@@ -179,7 +182,7 @@ class SwaphereMockServer:
 
     async def handle_cancel_order(self, request):
         """Handle DELETE /api/orders/{order_id} request"""
-        order_id = request.match_info['order_id']
+        order_id = request.match_info["order_id"]
 
         if order_id not in self.orders:
             return web.json_response({"error": "Order not found"}, status=404)
@@ -204,11 +207,7 @@ class SwaphereMockServer:
                         channel = data.get("channel")
                         product_id = data.get("product_id")
 
-                        response = {
-                            "type": "subscribed",
-                            "channel": channel,
-                            "product_id": product_id
-                        }
+                        response = {"type": "subscribed", "channel": channel, "product_id": product_id}
                         await ws.send_json(response)
 
                 elif msg.type == aiohttp.WSMsgType.ERROR:
@@ -237,7 +236,7 @@ class SwaphereMockServer:
                         "channel": "orderbook",
                         "product_id": trading_pair,
                         "bids": new_order_book["bids"][:5],  # Send only top 5 entries
-                        "asks": new_order_book["asks"][:5]   # Send only top 5 entries
+                        "asks": new_order_book["asks"][:5],  # Send only top 5 entries
                     }
 
                     # Send to all connected clients
@@ -249,8 +248,8 @@ class SwaphereMockServer:
 
                 # Broadcast trade updates
                 for trading_pair in self.order_books.keys():
-                    price = float(self.order_books[trading_pair]['bids'][0][0])
-                    size = float(self.order_books[trading_pair]['bids'][0][1])
+                    price = float(self.order_books[trading_pair]["bids"][0][0])
+                    size = float(self.order_books[trading_pair]["bids"][0][1])
                     side = "buy" if random.random() > 0.5 else "sell"
 
                     trade = {
@@ -258,15 +257,11 @@ class SwaphereMockServer:
                         "sequence": self.next_order_id,
                         "price": str(price + (random.random() - 0.5) * 5),
                         "size": str(size * random.random()),
-                        "side": side
+                        "side": side,
                     }
                     self.next_order_id += 1
 
-                    message = {
-                        "channel": "trades",
-                        "product_id": trading_pair,
-                        "data": trade
-                    }
+                    message = {"channel": "trades", "product_id": trading_pair, "data": trade}
 
                     for ws in self.ws_connections:
                         try:

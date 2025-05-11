@@ -53,11 +53,13 @@ def get_new_client_order_id(is_buy: bool, trading_pair: str) -> str:
     side = "B" if is_buy else "S"
     ts = int(datetime.now().timestamp() * 1000)
     import random
+
     nonce = random.randint(1000, 9999)  # Use random nonce for uniqueness
     return f"{side}-{trading_pair}-{ts}-{nonce}"
 
 
 # === Web Utils Functions ===
+
 
 def public_rest_url(path_url: str, domain: str = None) -> str:
     """
@@ -95,6 +97,7 @@ def format_trading_pair(trading_pair: str) -> str:
 
 
 # === Test Functions ===
+
 
 def test_split_trading_pair():
     """Test the split_trading_pair function"""
@@ -195,6 +198,7 @@ def test_format_trading_pair():
 
 
 # === Main Function ===
+
 
 def main():
     print("\n=== Testing Swaphere Utils ===\n")

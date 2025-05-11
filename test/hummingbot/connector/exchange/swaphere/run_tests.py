@@ -4,16 +4,30 @@ import argparse
 import asyncio
 import logging
 import sys
+import unittest
 
 from mock_server import SwaphereMockServer
 from test_local_server import run_all_tests as test_local_server
 from test_swaphere_basic import main as test_basic
 from test_swaphere_connector import main as test_connector
+from test_swaphere_import import SwaphereImportTest
 from test_swaphere_utils import main as test_utils
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+async def run_import_tests():
+    """Run the import tests to check for circular dependencies"""
+    logger.info("Running import tests...")
+
+    # Use unittest to run the import tests
+    loader = unittest.TestLoader()
+    suite = loader.loadTestsFromTestCase(SwaphereImportTest)
+    result = unittest.TextTestRunner(verbosity=2).run(suite)
+
+    return result.wasSuccessful()
 
 
 async def run_all_tests(use_mock=False):
@@ -29,6 +43,9 @@ async def run_all_tests(use_mock=False):
     try:
         logger.info("=== Running Swaphere connector tests ===")
 
+        logger.info("\n=== Import Dependency Tests ===")
+        import_result = await run_import_tests()
+
         logger.info("\n=== Basic Component Tests ===")
         basic_result = await test_basic()
 
@@ -43,13 +60,14 @@ async def run_all_tests(use_mock=False):
 
         # Print final results
         logger.info("\n=== Test Results Summary ===")
+        logger.info(f"Import tests: {'PASSED' if import_result else 'FAILED'}")
         logger.info(f"Basic tests: {'PASSED' if basic_result else 'FAILED'}")
         logger.info(f"Utility tests: {'PASSED' if utils_result else 'FAILED'}")
         logger.info(f"Connector tests: {'PASSED' if connector_result else 'FAILED'}")
         logger.info(f"Local server tests: {'PASSED' if server_result else 'FAILED'}")
 
         # Return overall status
-        all_passed = all([basic_result, utils_result, connector_result, server_result])
+        all_passed = all([import_result, basic_result, utils_result, connector_result, server_result])
         logger.info(f"\nOverall test result: {'ALL TESTS PASSED' if all_passed else 'SOME TESTS FAILED'}")
 
         return all_passed
@@ -62,8 +80,8 @@ async def run_all_tests(use_mock=False):
 
 def main():
     """Main entry point"""
-    parser = argparse.ArgumentParser(description='Run Swaphere connector tests')
-    parser.add_argument('--mock', action='store_true', help='Use mock server instead of a real local server')
+    parser = argparse.ArgumentParser(description="Run Swaphere connector tests")
+    parser.add_argument("--mock", action="store_true", help="Use mock server instead of a real local server")
     args = parser.parse_args()
 
     if args.mock:

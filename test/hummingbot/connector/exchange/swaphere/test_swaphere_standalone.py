@@ -13,24 +13,19 @@ DEFAULT_BLOCKCHAIN_CONTEXT = {
     "name": "Swaphere",
     "version": "1",
     "chainId": 1,
-    "verifyingContract": "0x0987654321098765432109876543210987654321"
+    "verifyingContract": "0x0987654321098765432109876543210987654321",
 }
 
 # Mock token information
-ETH_TOKEN = {
-    "address": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
-    "decimal": 18
-}
+ETH_TOKEN = {"address": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2", "decimal": 18}
 
-USDC_TOKEN = {
-    "address": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
-    "decimal": 6
-}
+USDC_TOKEN = {"address": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", "decimal": 6}
 
 
 # Simplified SwaphereAuth class
 class SwaphereAuth:
     """Simplified Auth class for Swaphere exchange using private key authentication"""
+
     def __init__(self, private_key: str):
         if private_key.startswith("0x"):
             private_key = private_key[2:]
@@ -61,9 +56,6 @@ class SwaphereAuth:
         sender = self.address
         blockchain_context = DEFAULT_BLOCKCHAIN_CONTEXT
         standard = blockchain_context.get("partialTokenSwapStandard", "")
-        header_length = 32
-        instruction_length = 72 if is_full_order else 88
-        signature_length = 65 if solver == self.address else 130
         nonce = 0
         timestamp = int(time.time()) + expiration_minutes * 60
 
@@ -71,7 +63,7 @@ class SwaphereAuth:
         max_out_amount = int(round(out_amount * (10 ** out_token["decimal"])))
         max_in_amount = int(round(in_amount * (10 ** in_token["decimal"])))
 
-        print(f"Building intent with:")
+        print("Building intent with:")
         print(f"is_full_order: {is_full_order}")
         print(f"nonce: {nonce}")
         print(f"timestamp: {timestamp}")
@@ -114,14 +106,14 @@ class SwaphereAuth:
             "name": blockchain_context.get("name", "Swaphere"),
             "version": blockchain_context.get("version", "1"),
             "chainId": blockchain_context.get("chainId", 1),
-            "verifyingContract": blockchain_context.get("verifyingContract", "")
+            "verifyingContract": blockchain_context.get("verifyingContract", ""),
         }
 
 
 # Test the auth implementation
 async def test_swaphere_auth():
     # Test private key (this is a sample key, not a real one)
-    private_key = "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    private_key = "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"  # noqa: mock
 
     print("\n=== Testing Swaphere Auth ===\n")
 
@@ -130,27 +122,26 @@ async def test_swaphere_auth():
         auth = SwaphereAuth(private_key)
 
         # Test building a full order intent
-        full_intent = await auth.build_intent(
+        await auth.build_intent(
             is_full_order=True,  # Full order (limit order)
             out_token=ETH_TOKEN,
             out_amount=0.01,  # Small amount for testing
             in_token=USDC_TOKEN,
             in_amount=20.0,  # Small amount for testing
             expiration_minutes=60,
-            solver=None  # Use own address
+            solver=None,  # Use own address
         )
 
         print("\nFull order intent generated successfully")
 
-        # Test building a partial order intent
-        partial_intent = await auth.build_intent(
+        await auth.build_intent(
             is_full_order=False,  # Partial order (market order)
             out_token=ETH_TOKEN,
             out_amount=0.005,  # Small amount for testing
             in_token=USDC_TOKEN,
             in_amount=10.0,  # Small amount for testing
             expiration_minutes=30,
-            solver=None  # Use own address
+            solver=None,  # Use own address
         )
 
         print("\nPartial order intent generated successfully")
@@ -159,6 +150,7 @@ async def test_swaphere_auth():
     except Exception as e:
         print(f"Error testing Swaphere auth: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 

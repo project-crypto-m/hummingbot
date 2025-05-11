@@ -1,9 +1,11 @@
 import re
 from datetime import datetime
-from typing import Optional, Tuple
+from typing import Tuple
 
-from hummingbot.client.config.config_var import ConfigVar
-from hummingbot.client.config.config_methods import using_exchange
+from pydantic import Field, SecretStr
+from pydantic.dataclasses import ConfigDict
+
+from hummingbot.client.config.config_data_types import BaseConnectorConfigMap
 from hummingbot.core.utils.tracking_nonce import get_tracking_nonce
 
 # Updated pattern to handle different types of trading pair formats
@@ -58,17 +60,23 @@ def get_new_client_order_id(is_buy: bool, trading_pair: str) -> str:
     return f"{side}-{trading_pair}-{ts}-{get_tracking_nonce()}"
 
 
-KEYS = {
-    "swaphere_private_key": ConfigVar(
-        key="swaphere_private_key",
-        prompt="Enter your Ethereum private key for Swaphere >>> ",
-        required_if=using_exchange("swaphere"),
-        is_secure=True,
-        is_connect_key=True,
-    ),
-}
+class SwaphereConfigMap(BaseConnectorConfigMap):
+    connector: str = "swaphere"
+    swaphere_private_key: SecretStr = Field(
+        default=...,
+        json_schema_extra={
+            "prompt": "Enter your Ethereum private key for Swaphere >>> ",
+            "is_secure": True,
+            "is_connect_key": True,
+            "prompt_on_new": True,
+        },
+    )
+    model_config = ConfigDict(title="swaphere")
 
-# Constants related to the exchange
+
+# These constants are used for connector registration
+KEYS = SwaphereConfigMap.model_construct()
 CENTRALIZED = False  # Swaphere is not a centralized exchange since it's based on blockchain
 EXAMPLE_PAIR = "ETH-USDC"
-DEFAULT_FEES = [0.1, 0.1]  # Maker and taker fees in percentage 
+DEFAULT_FEES = [0.1, 0.1]  # Maker and taker fees in percentage
+USE_ETHEREUM_WALLET = False  # Changed to False so it appears in connect options

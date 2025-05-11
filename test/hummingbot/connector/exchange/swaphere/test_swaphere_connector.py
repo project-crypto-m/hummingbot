@@ -2,7 +2,6 @@ import asyncio
 import logging
 from decimal import Decimal
 
-
 # Import Swaphere connector
 from hummingbot.connector.exchange.swaphere.swaphere_exchange import SwaphereExchange
 
@@ -15,15 +14,11 @@ logger = logging.getLogger(__name__)
 
 async def test_swaphere_connector():
     # Test private key (replace with a real one for actual testing)
-    test_private_key = "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    test_private_key = "0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"  # noqa: mock
 
     # Create the exchange instance
     logger.info("Initializing Swaphere exchange...")
-    exchange = SwaphereExchange(
-        private_key=test_private_key,
-        trading_pairs=["ETH-USDC"],
-        trading_required=True
-    )
+    exchange = SwaphereExchange(private_key=test_private_key, trading_pairs=["ETH-USDC"], trading_required=True)
 
     try:
         # Initialize the exchange
@@ -58,7 +53,7 @@ async def test_swaphere_connector():
             order_type=exchange.MARKET,
             order_side=exchange.BUY,
             amount=Decimal("1.0"),
-            price=Decimal("2000.0")
+            price=Decimal("2000.0"),
         )
         logger.info(f"Trading fee: {fee}")
 
@@ -68,6 +63,7 @@ async def test_swaphere_connector():
         # Stop the exchange
         logger.info("Stopping network...")
         await exchange.stop_network()
+
 
 # Main function
 if __name__ == "__main__":

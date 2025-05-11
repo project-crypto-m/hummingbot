@@ -1,9 +1,8 @@
 import json
-import aiohttp
-from typing import Callable, Dict, Any, Optional
+from typing import Any, Dict, Optional
 
 from hummingbot.connector.exchange.swaphere import swaphere_constants as CONSTANTS
-from hummingbot.core.web_assistant.connections.data_types import RESTMethod, RESTResponse
+from hummingbot.core.web_assistant.connections.data_types import RESTMethod
 from hummingbot.core.web_assistant.rest_assistant import RESTAssistant
 from hummingbot.core.web_assistant.web_assistants_factory import WebAssistantsFactory
 
@@ -62,14 +61,14 @@ async def api_request(
     :return: the response from the API
     """
     rest_assistant: RESTAssistant = await api_factory.get_rest_assistant()
-    
+
     if is_auth_required:
         url = private_rest_url(path, domain)
     else:
         url = public_rest_url(path, domain)
-        
+
     headers = {"Content-Type": "application/json"} if data else {}
-    
+
     response = await rest_assistant.execute_request(
         method=rest_method,
         url=url,
@@ -77,11 +76,11 @@ async def api_request(
         data=json.dumps(data) if data else None,
         headers=headers,
     )
-    
+
     if response.status != 200:
         response_json = await response.json()
         raise IOError(build_api_error_message(response.status, response_json))
-    
+
     response_json = await response.json()
     return response_json
 
@@ -96,4 +95,4 @@ def format_trading_pair(trading_pair: str) -> str:
     if "/" in trading_pair:
         base, quote = trading_pair.split("/")
         return f"{base}-{quote}"
-    return trading_pair 
+    return trading_pair

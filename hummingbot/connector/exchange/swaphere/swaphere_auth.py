@@ -1,21 +1,33 @@
-import time
-from typing import Dict, Any, Optional
 import json
+import secrets
+import time
+from typing import Any, Dict
 
-from ethers import Wallet
+from eth_account import Account
+from eth_account.messages import encode_defunct
+from web3 import Web3
+
 from hummingbot.core.web_assistant.auth import AuthBase
 from hummingbot.core.web_assistant.connections.data_types import RESTRequest, WSRequest
-from hummingbot.connector.exchange.swaphere.swaphere_constants import DEFAULT_BLOCKCHAIN_CONTEXT, TYPES
 
 
 class SwaphereAuth(AuthBase):
     """
     Auth class for Swaphere exchange using private key authentication
     """
+
     def __init__(self, private_key: str):
+        if private_key is None:
+            # For non-trading uses, create a dummy key
+            private_key = "0x" + secrets.token_hex(32)
+
+        if private_key.startswith("0x"):
+            private_key = private_key[2:]
+
         self.private_key = private_key
-        self.wallet = Wallet(private_key)
-        self.address = self.wallet.address
+        self.account = Account.from_key(private_key)
+        self.address = self.account.address
+        self.web3 = Web3()
 
     async def rest_authenticate(self, request: RESTRequest) -> RESTRequest:
         """
@@ -31,20 +43,14 @@ class SwaphereAuth(AuthBase):
         """
         # Build auth message for websocket
         timestamp = str(int(time.time()))
-        
-        auth_params = {
-            "op": "login",
-            "args": [{
-                "address": self.address,
-                "timestamp": timestamp
-            }]
-        }
-        
+
+        auth_params = {"op": "login", "args": [{"address": self.address, "timestamp": timestamp}]}
+
         # Add auth params to the payload
         request.payload = auth_params
-        
+
         return request
-        
+
     async def build_intent(
         self,
         is_full_order: bool,
@@ -57,44 +63,22 @@ class SwaphereAuth(AuthBase):
     ) -> str:
         """
         Builds an order intent using private key for authentication
-        Implementation of the buildIntent function from Swaphere
+        Simplified implementation using web3 and eth-account
         """
         # If solver not provided, use own wallet address
         if solver is None:
             solver = self.address
-            
+
         sender = self.address
-        blockchain_context = DEFAULT_BLOCKCHAIN_CONTEXT
-        standard = blockchain_context.get("partialTokenSwapStandard", "")
-        header_length = 32
-        instruction_length = 72 if is_full_order else 88
-        signature_length = 65 if solver == self.address else 130
         nonce = 0
         timestamp = int(time.time()) + expiration_minutes * 60
-        
+
         max_out_amount = int(round(out_amount * (10 ** out_token["decimal"])))
         max_in_amount = int(round(in_amount * (10 ** in_token["decimal"])))
-        
-        # Create packed header and instructions using ethers.js solidityPacked
-        header_and_instructions = self.wallet.provider._encode_packed(
-            ["uint8", "uint24", "uint64", "address", "address", "uint128", "address", "uint128"],
-            [
-                1 if is_full_order else 0, 
-                nonce, 
-                timestamp, 
-                solver, 
-                out_token["address"], 
-                str(max_out_amount), 
-                in_token["address"], 
-                str(max_in_amount)
-            ]
-        )
-        
-        # Get domain for signing
-        domain = self._get_domain(blockchain_context)
-        
-        # Get values for signing
-        value = {
+
+        # Create a structured message that simulates the EIP-712 message
+        # In a full implementation, this would use proper EIP-712 typing
+        message = {
             "isFullOrder": is_full_order,
             "nonce": nonce,
             "timestamp": timestamp,
@@ -102,29 +86,33 @@ class SwaphereAuth(AuthBase):
             "outToken": out_token["address"],
             "outAmount": str(max_out_amount),
             "inToken": in_token["address"],
-            "inAmount": str(max_in_amount)
+            "inAmount": str(max_in_amount),
         }
-        
-        # Sign the typed data using EIP-712
-        signature = await self.wallet.signTypedData(domain, TYPES, value)
-        
-        # Construct the final intent based on order type
-        if is_full_order:
-            return self.wallet.provider._encode_packed(
-                ["address", "address", "uint16", "uint16", "uint16", "bytes", "bytes"],
-                [sender, standard, header_length, instruction_length, signature_length, header_and_instructions, signature]
-            )
-        else:
-            return self.wallet.provider._encode_packed(
-                ["address", "address", "uint16", "uint16", "uint16", "bytes", "uint128", "bytes"],
-                [sender, standard, header_length, instruction_length, signature_length, header_and_instructions, 0, signature]
-            )
-    
+
+        # Convert message to a signable format
+        message_json = json.dumps(message, sort_keys=True)
+        message_hash = self.web3.keccak(text=message_json)
+
+        # Sign the message
+        signable_message = encode_defunct(primitive=message_hash)
+        signed_message = self.account.sign_message(signable_message)
+        signature = signed_message.signature.hex()
+
+        # For a simplified implementation, just return the signature and message in a format
+        # that can be decoded by the server
+        intent = {
+            "message": message,
+            "signature": signature,
+            "sender": sender,
+        }
+
+        return json.dumps(intent)
+
     def _get_domain(self, blockchain_context: Dict[str, Any]) -> Dict[str, Any]:
         """Get EIP-712 domain data"""
         return {
             "name": blockchain_context.get("name", "Swaphere"),
             "version": blockchain_context.get("version", "1"),
             "chainId": blockchain_context.get("chainId", 1),
-            "verifyingContract": blockchain_context.get("verifyingContract", "")
-        } 
+            "verifyingContract": blockchain_context.get("verifyingContract", ""),
+        }

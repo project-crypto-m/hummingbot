@@ -98,4 +98,4 @@ RATE_LIMITS = [
     RateLimit(limit_id=SWAPHERE_ORDER_RESERVE_PATH, limit=20, time_interval=2),
     RateLimit(limit_id=SWAPHERE_ORDERBOOK_PATH, limit=10, time_interval=2),
     RateLimit(limit_id=SWAPHERE_MARKET_ORDERS_PATH, limit=10, time_interval=2),
-] 
+]
